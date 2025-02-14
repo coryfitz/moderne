@@ -151,6 +151,55 @@ def test_run_uvicorn_popen_error(monkeypatch):
 
     run_uvicorn(port=8000)
 
+def test_run_uvicorn_general_exception(monkeypatch):
+    """Test if an unexpected exception is raised in `run_uvicorn`."""
+    
+    def mock_is_port_in_use(port):
+        return False
+
+    def mock_popen(cmd):
+        raise Exception("Unexpected error")
+
+    monkeypatch.setattr("framework.cli.is_port_in_use", mock_is_port_in_use)
+    monkeypatch.setattr("subprocess.Popen", mock_popen)
+
+    with pytest.raises(Exception, match="Unexpected error"):
+        run_uvicorn(port=8000)
+
+def test_run_uvicorn_browser_fail(monkeypatch):
+    """Test if `webbrowser.open` fails gracefully."""
+    
+    def mock_is_port_in_use(port):
+        return False
+
+    def mock_popen(cmd):
+        return None  # Simulate successful start
+
+    def mock_webbrowser_open(url):
+        raise RuntimeError("Browser error")
+
+    monkeypatch.setattr("framework.cli.is_port_in_use", mock_is_port_in_use)
+    monkeypatch.setattr("subprocess.Popen", mock_popen)
+    monkeypatch.setattr("webbrowser.open", mock_webbrowser_open)
+
+    with pytest.raises(RuntimeError, match="Browser error"):
+        run_uvicorn(port=8000)
+
+@pytest.mark.parametrize("user_input", ["maybe", "", "1234"])
+def test_run_uvicorn_invalid_user_input(monkeypatch, user_input):
+    """Test `run_uvicorn` with unexpected user input."""
+
+    def mock_is_port_in_use(port):
+        return True
+
+    def mock_input(prompt):
+        return user_input  # Return invalid input
+
+    monkeypatch.setattr("framework.cli.is_port_in_use", mock_is_port_in_use)
+    monkeypatch.setattr("builtins.input", mock_input)
+
+    run_uvicorn(port=8000)
+
 def test_create_app_directory_success(monkeypatch, tmp_path):
     """Test successful creation of an app directory without using unittest.mock."""
 
@@ -198,6 +247,44 @@ def test_create_app_directory_success(monkeypatch, tmp_path):
     assert (test_dir / "app").exists(), "app subdirectory should be created"
     assert (test_dir / "app" / "routes").exists(), "routes subdirectory should be created"
     assert (test_dir / "app" / "static").exists(), "static subdirectory should be created"
+
+def test_create_app_directory_existing_directory(monkeypatch, tmp_path):
+    """Test if `create_app_directory` exits when the directory already exists."""
+    
+    existing_dir = tmp_path / "test_app"
+    existing_dir.mkdir()
+
+    def mock_os_getcwd():
+        return str(tmp_path)
+
+    monkeypatch.setattr(os, "getcwd", mock_os_getcwd)
+    monkeypatch.setattr(os.path, "exists", lambda path: True)
+
+    create_app_directory("test_app")
+
+    # Check if the function exited without creating extra files
+    assert not (existing_dir / "settings.py").exists()
+
+def test_create_app_directory_import_error(monkeypatch, tmp_path, capsys):
+    """Test if `create_app_directory` handles import errors gracefully by capturing stderr."""
+
+    def mock_import_module(name):
+        raise ModuleNotFoundError("Fake import error")
+
+    def mock_os_getcwd():
+        return str(tmp_path)  # Ensure it operates in a temp directory
+
+    def mock_os_path_exists(path):
+        return False  # Ensure the function does not exit early
+
+    monkeypatch.setattr("framework.cli.importlib.import_module", mock_import_module)
+    monkeypatch.setattr(os, "getcwd", mock_os_getcwd)
+    monkeypatch.setattr(os.path, "exists", mock_os_path_exists)
+
+    create_app_directory("test_app")  # Call the function normally
+
+    captured = capsys.readouterr()  # Capture stdout and stderr
+    assert "An error occurred while creating the directory: Fake import error" in captured.out
 
 def test_main_new_command_with_name(monkeypatch, capsys):
     """Test `main()` with 'new' command and a valid app name."""
@@ -258,3 +345,35 @@ def test_main_invalid_command(monkeypatch, capsys):
 
     captured = capsys.readouterr()
     assert "Invalid command" in captured.out
+
+def test_main_no_command(monkeypatch, capsys):
+    """Test `main()` with no command provided. Expect SystemExit due to missing args."""
+    
+    monkeypatch.setattr(sys, "argv", ["cli.py"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+
+    assert excinfo.value.code == 2  # Verify it exited with status 2
+    captured = capsys.readouterr()
+    assert "error: the following arguments are required: command" in captured.err
+
+def test_main_run_command_invalid_port(monkeypatch, capsys):
+    """Test `main()` when `run` command is given an invalid port."""
+
+    monkeypatch.setattr(sys, "argv", ["cli.py", "run", "--port", "invalid"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+
+    assert excinfo.value.code == 2  # Verify it exited with status 2
+    captured = capsys.readouterr()
+    assert "error: argument --port: invalid int value" in captured.err
+
+def test_cli_main_entrypoint():
+    """Test if `cli.py` runs without errors when executed directly."""
+    
+    result = subprocess.run([sys.executable, "-m", "framework.cli"], capture_output=True, text=True)
+
+    assert "usage:" in result.stderr  # Expect argparse usage message due to missing args
+    assert result.returncode == 2  # Argparse exits with 2 when required args are missing
