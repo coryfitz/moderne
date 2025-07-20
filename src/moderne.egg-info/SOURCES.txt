@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+src/moderne/__init__.py
+src/moderne/cli.py
+src/moderne.egg-info/PKG-INFO
+src/moderne.egg-info/SOURCES.txt
+src/moderne.egg-info/dependency_links.txt
+src/moderne.egg-info/entry_points.txt
+src/moderne.egg-info/top_level.txt
+src/moderne/templates/__init__.py
+src/moderne/templates/app.py
+src/moderne/templates/index.py
+src/moderne/templates/main.py
+src/moderne/templates/settings.py
+tests/test_cli.py

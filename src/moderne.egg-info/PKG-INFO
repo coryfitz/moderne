@@ -1,0 +1,21 @@
+Metadata-Version: 2.4
+Name: moderne
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+
+# moderne
+
+Start a new moderne app
+
+```
+moderne new <app_name>
+```
+
+Run the development server
+
+```
+cd <app_name>
+moderne run
+```

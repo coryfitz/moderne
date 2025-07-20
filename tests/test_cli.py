@@ -7,8 +7,8 @@ import shutil
 import importlib
 import importlib.resources
 from pathlib import Path
-from .. import cli
-from ..cli import is_port_in_use, find_next_available_port, run_uvicorn, create_app_directory, main
+from ..moderne import cli
+from ..moderne.cli import is_port_in_use, find_next_available_port, run_uvicorn, create_app_directory, main
 
 def test_is_port_in_use():
     """Test if is_port_in_use correctly detects an open/closed port."""
